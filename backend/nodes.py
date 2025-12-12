@@ -10,7 +10,6 @@ class NodeCreate(BaseModel):
     type: str
     position: int
 
-
 @router.post("/{path_id}/nodes")
 def create_node(
     path_id: str,
@@ -46,7 +45,8 @@ def create_node(
             "position": data.position
         }).fetchone()
 
-    return dict(node)
+    # FIX HERE
+    return dict(node._mapping)
 
 
 @router.get("/{path_id}/nodes")
@@ -68,4 +68,5 @@ def list_nodes(
             "user_id": current_user["sub"]
         }).fetchall()
 
-    return [dict(n) for n in nodes]
+    # FIX HERE
+    return [dict(n._mapping) for n in nodes]

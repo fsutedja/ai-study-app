@@ -31,7 +31,7 @@ def create_path(
             }
         ).fetchone()
 
-    return result._mapping   # ← THIS FIXES THE 500
+    return result._mapping
 
 @router.get("/")
 def list_paths(current_user: dict = Depends(get_current_user)):
@@ -48,4 +48,4 @@ def list_paths(current_user: dict = Depends(get_current_user)):
             {"user_id": current_user["sub"]}
         ).fetchall()
 
-    return [r._mapping for r in results]   # ← ALSO FIXED
+    return [r._mapping for r in results]
