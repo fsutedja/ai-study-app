@@ -149,9 +149,9 @@ def submit_question_attempt(
     # 4. Store attempt
     insert_attempt = text("""
         INSERT INTO learning_question_attempts
-        (user_id, question_id, is_correct)
+        (user_id, question_id, user_answer, is_correct)
         VALUES
-        (:user_id, :question_id, :is_correct)
+        (:user_id, :question_id, :user_answer, :is_correct)
     """)
 
     with engine.begin() as conn:
@@ -160,6 +160,7 @@ def submit_question_attempt(
             {
                 "user_id": current_user["sub"],
                 "question_id": question_id,
+                "user_answer": data.answer,
                 "is_correct": is_correct
             }
         )
@@ -187,6 +188,55 @@ def submit_question_attempt(
     total = stats.total or 0
     correct = stats.correct or 0
     mastery = (correct / total) if total > 0 else 0.0
+
+    # 6. If mastery passes threshold, complete node + unlock next
+    if mastery >= 0.8:
+        with engine.begin() as conn:
+            # mark current node completed
+            conn.execute(
+                text("""
+                    UPDATE learning_nodes
+                    SET status = 'completed'
+                    WHERE id = :node_id
+                      AND status <> 'completed'
+                """),
+                {"node_id": question.node_id},
+            )
+
+            # get current node's path + position
+            node_info = conn.execute(
+                text("""
+                    SELECT path_id, position
+                    FROM learning_nodes
+                    WHERE id = :node_id
+                """),
+                {"node_id": question.node_id},
+            ).mappings().fetchone()
+
+            # find next node by position
+            next_node = conn.execute(
+                text("""
+                    SELECT id
+                    FROM learning_nodes
+                    WHERE path_id = :path_id
+                      AND position > :position
+                    ORDER BY position ASC
+                    LIMIT 1
+                """),
+                {"path_id": node_info["path_id"], "position": node_info["position"]},
+            ).mappings().fetchone()
+
+            # unlock next node if currently locked
+            if next_node:
+                conn.execute(
+                    text("""
+                        UPDATE learning_nodes
+                        SET status = 'unlocked'
+                        WHERE id = :next_id
+                          AND status = 'locked'
+                    """),
+                    {"next_id": next_node["id"]},
+                )
 
     return {
         "question_id": question_id,
